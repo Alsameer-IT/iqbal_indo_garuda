@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remittance Receipt Extractor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .upload-section {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+        }
+        .receipt-container {
+            display: none;
+            margin-top: 30px;
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 5px;
+            background-color: white;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .section-title {
+            background-color: #f8f9fa;
+            padding: 8px 15px;
+            font-weight: bold;
+            border-left: 4px solid #3498db;
+            margin-bottom: 10px;
+        }
+        .detail-row {
+            display: flex;
+            margin-bottom: 8px;
+        }
+        .detail-key {
+            font-weight: bold;
+            width: 200px;
+            color: #555;
+        }
+        .detail-value {
+            flex: 1;
+            white-space: pre-wrap;
+        }
+        .total-amount {
+            font-weight: bold;
+            font-size: 18px;
+            text-align: right;
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+        }
+        .button-container {
+            text-align: center;
+            margin-top: 20px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        #fileInput {
+            display: none;
+        }
+        .upload-label {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .upload-label:hover {
+            background-color: #2980b9;
+        }
+        #loading {
+            display: none;
+            text-align: center;
+            margin: 10px 0;
+            color: #555;
+        }
+        .error-message {
+            color: #e74c3c;
+            text-align: center;
+            margin-top: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="text-align: center;">
+            <h1 style="display: inline-block; font-family: Arial, Helvetica, sans-serif;">
+                <img 
+                    src="https://flagcdn.com/w40/id.png" 
+                    alt="Indonesia Flag" 
+                    style="vertical-align: middle; margin-right: 8px; border: 2px solid #000; border-radius: 4px;">
+                Indonesia
+            </h1>
+        </div>
+
+        <div class="upload-section">
+            <input type="file" id="fileInput" accept=".pdf">
+            <label for="fileInput" class="upload-label">Choose PDF File</label>
+            <p id="fileName"></p>
+            <div id="loading">Processing...</div>
+            <div id="countryError" class="error-message">Receipt can only be downloaded for Indonesia payout country.</div>
+        </div>
+        
+        <div class="receipt-container" id="receiptContainer">
+            <div class="section">
+                <div class="section-title">Receipt Information</div>
+                <div class="detail-row">
+                    <div class="detail-key">Receipt No:</div>
+                    <div class="detail-value" id="receiptNo"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-key">Date:</div>
+                    <div class="detail-value" id="receiptDate"></div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Sender Details</div>
+                <div class="detail-row">
+                    <div class="detail-key">Name:</div>
+                    <div class="detail-value" id="senderName"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-key">Passport No:</div>
+                    <div class="detail-value" id="passportNo"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-key">IC No:</div>
+                    <div class="detail-value" id="icNo"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-key">Address:</div>
+                    <div class="detail-value" id="senderAddress"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-key">Citizenship:</div>
+                    <div class="detail-value" id="citizenship"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-key">Profession:</div>
+                    <div class="detail-value" id="profession"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-key">Mobile No:</div>
+                    <div class="detail-value" id="senderMobile"></div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-title">Beneficiary Details</div>
+                <div class="detail-row">
+                    <div class="detail-key">Country:</div>
+                    <div class="detail-value" id="beneficiaryCountry"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-key">Name:</div>
+                    <div class="detail-value" id="beneficiaryName"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-key">Bank:</div>
+                    <div class="detail-value" id="bankName"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-key">Account Number:</div>
+                    <div class="detail-value" id="accountNo"></div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-title">Payment Details</div>
+                <div class="detail-row">
+                    <div class="detail-key">Payout Amount:</div>
+                    <div class="detail-value" id="payoutAmount"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-key">FX Rate:</div>
+                    <div class="detail-value" id="fxRate"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-key">Send Amount:</div>
+                    <div class="detail-value" id="sendAmount"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-key">Service Fee:</div>
+                    <div class="detail-value" id="serviceFee"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-key">Source:</div>
+                    <div class="detail-value" id="source"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-key">Purpose:</div>
+                    <div class="detail-value" id="purpose"></div>
+                </div>
+                <div class="total-amount" id="totalAmount"></div>
+            </div>
+            
+            <div class="button-container">
+                <button id="downloadBtn" disabled title="Upload a valid PDF to enable download">Get Receipt</button>
+                <button id="resetBtn" style="background-color: #e74c3c; margin-left: 10px;">Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
+        
+  // Indonesia Section (from index 2)
+const fileInput = document.getElementById('fileInput');
+const fileNameDisplay = document.getElementById('fileName');
+const receiptContainer = document.getElementById('receiptContainer');
+const loadingIndicator = document.getElementById('loading');
+const downloadBtn = document.getElementById('downloadBtn');
+const resetBtn = document.getElementById('resetBtn');
+const countryError = document.getElementById('countryError');
+
+fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    fileNameDisplay.textContent = `Selected file: ${file.name}`;
+    loadingIndicator.style.display = 'block';
+    countryError.style.display = 'none';
+    
+    try {
+        const extractedData = await extractDataFromPDF(file);
+        populateReceipt(extractedData);
+        receiptContainer.style.display = 'block';
+        
+        const isIndonesia = extractedData.beneficiaryCountry && 
+                          extractedData.beneficiaryCountry.toLowerCase().includes('indonesia');
+        
+        if (isIndonesia) {
+            downloadBtn.disabled = false;
+            downloadBtn.title = 'Download Receipt';
+            downloadBtn.style.backgroundColor = '#3498db';
+        } else {
+            downloadBtn.disabled = true;
+            downloadBtn.title = 'Receipt can only be downloaded for Indonesia payout country';
+            downloadBtn.style.backgroundColor = '#95a5a6';
+            countryError.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error processing PDF:', error);
+        alert('Error processing PDF. Please ensure it is a valid PDF and has the correct format.');
+    } finally {
+        loadingIndicator.style.display = 'none';
+    }
+});
+
+resetBtn.addEventListener('click', () => {
+    fileInput.value = '';
+    fileNameDisplay.textContent = 'No file selected';
+    receiptContainer.style.display = 'none';
+    downloadBtn.disabled = true;
+    downloadBtn.style.backgroundColor = '#3498db';
+    document.querySelectorAll('.detail-value').forEach(el => el.textContent = '');
+    document.getElementById('totalAmount').textContent = '';
+    countryError.style.display = 'none';
+});
+
+async function extractDataFromPDF(file) {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+    const page = await pdf.getPage(1);
+    const textContent = await page.getTextContent();
+    
+    const items = textContent.items.map(item => ({
+        text: item.str,
+        x: item.transform[4],
+        y: item.transform[5]
+    }));
+    
+    items.sort((a, b) => {
+        const yDiff = Math.abs(a.y - b.y);
+        if (yDiff < 5) return a.x - b.x;
+        return b.y - a.y;
+    });
+    
+    let lines = [];
+    let currentLine = [];
+    let lastY = items[0]?.y || 0;
+    
+    items.forEach(item => {
+        if (Math.abs(item.y - lastY) < 5) {
+            currentLine.push(item.text);
+        } else {
+            if (currentLine.length > 0) {
+                lines.push(currentLine.join(' '));
+            }
+            currentLine = [item.text];
+            lastY = item.y;
+        }
+    });
+    if (currentLine.length > 0) {
+        lines.push(currentLine.join(' '));
+    }
+    
+    const text = lines.join('\n');
+    const data = {};
+    
+    const getNextLines = (startIndex, maxLines = 10) => {
+        const nextLines = [];
+        for (let i = startIndex + 1; i < Math.min(startIndex + 1 + maxLines, lines.length); i++) {
+            const line = lines[i].trim();
+            if (line.match(/^(Sender|Beneficiary|Account|FX|Send|Source|Purpose|#|Receipt|Date|SERVICE|REMITTANCE|TOTAL)/i)) {
+                break;
+            }
+            nextLines.push(line);
+        }
+        return nextLines;
+    };
+    
+    lines.forEach((line, index) => {
+        if (line.includes('Receipt#')) {
+            const match = line.match(/Receipt#\s*([^\s]+)/);
+            if (match) data.receiptNo = match[1];
+        }
+        if (line.includes('Date') && !line.includes('Sender')) {
+            const match = line.match(/Date\s+([\d.]+)/);
+            if (match) data.date = match[1];
+        }
+        
+        if (line.includes('Sender Passport No')) {
+            const match = line.match(/Sender Passport No\s+([^\s]+)/);
+            if (match) data.passportNo = match[1];
+        }
+        if (line.includes('Sender IC No')) {
+            const match = line.match(/Sender IC No\s+([^\s]+)/);
+            if (match) data.icNo = match[1];
+        }
+        if (line.includes('Sender Address')) {
+            const match = line.match(/Sender Address\s+(.+)/);
+            if (match) {
+                let address = match[1];
+                address = address.replace(/Sender Citizenship.*/i, '').trim();
+                const nextLines = getNextLines(index, 5);
+                if (nextLines.length > 0) {
+                    address += ' ' + nextLines.join(' ');
+                }
+                data.senderAddress = address.trim();
+            }
+        }
+        if (line.includes('Sender Citizenship')) {
+            const match = line.match(/Sender Citizenship\s+([^\s]+)/);
+            if (match) data.citizenship = match[1];
+        }
+        if (line.includes('Sender Profession')) {
+            const match = line.match(/Sender Profession\s+([A-Z\s]+?)(?=\s+Sender|$)/);
+            if (match) data.profession = match[1].trim();
+        }
+        if (line.includes('Sender Name')) {
+            const match = line.match(/Sender Name\s+(.+)/);
+            if (match) {
+                let name = match[1].replace(/Sender Mobile.*/i, '').trim();
+                const nextLines = getNextLines(index, 2);
+                if (nextLines.length > 0) {
+                    name += ' ' + nextLines.join(' ');
+                }
+                data.senderName = name.trim();
+            }
+        }
+        if (line.includes('Sender Mobile No')) {
+            const match = line.match(/Sender Mobile No\s+(\d+)/);
+            if (match) data.senderMobile = match[1];
+        }
+        
+        if (line.includes('Beneficiary Country')) {
+            const match = line.match(/Beneficiary Country\s+([A-Za-z]+)/);
+            if (match) data.beneficiaryCountry = match[1];
+        }
+        if (line.includes('Beneficiary Bank')) {
+            const match = line.match(/Beneficiary Bank\s+([A-Z]+)/);
+            if (match) data.beneficiaryBank = match[1];
+        }
+        if (line.includes('Beneficiary Name')) {
+            const match = line.match(/Beneficiary Name\s+(.+)/);
+            if (match) {
+                let name = match[1].replace(/Account Number.*/i, '').trim();
+                const nextLines = getNextLines(index, 2);
+                if (nextLines.length > 0) {
+                    name += ' ' + nextLines.join(' ');
+                }
+                data.beneficiaryName = name.trim();
+            }
+        }
+        if (line.includes('Account Number')) {
+            const match = line.match(/Account Number\s+(\d+)/);
+            if (match) data.accountNumber = match[1];
+        }
+        
+        if (line.includes('FX Rate')) {
+            const match = line.match(/FX Rate\s+([\d,.]+)/);
+            if (match) data.fxRate = parseFloat(match[1].replace(/,/g, ''));
+        }
+        
+        // Extract Send Amount from the main section (full precision value)
+        if (line.includes('Send Amount') && line.includes('(BND)')) {
+            const match = line.match(/Send Amount \(([A-Z]+)\)\s+([\d,.]+)/);
+            if (match) {
+                data.sendAmountCurrency = match[1];
+                data.sendAmountValue = parseFloat(match[2].replace(/,/g, ''));
+            }
+        }
+        
+        // Extract SEND AMOUNT from table (rounded to 2 decimals) - this is more reliable
+        if (line.match(/^\d+\s+SEND AMOUNT \(BND\)/i)) {
+            const match = line.match(/SEND AMOUNT \(BND\)\s+([\d,.]+)/i);
+            if (match) {
+                data.sendAmountValue = parseFloat(match[1].replace(/,/g, ''));
+                data.sendAmountCurrency = 'BND';
+            }
+        }
+        
+        // Extract SERVICE FEE from table format
+        if (line.includes('SERVICE FEE')) {
+            // Pattern 1: "2 SERVICE FEE 10.00"
+            let match = line.match(/SERVICE FEE\s+([\d,.]+)/);
+            if (match) {
+                data.serviceFeeValue = parseFloat(match[1].replace(/,/g, ''));
+            } else {
+                // Pattern 2: "SERVICE FEE BND 10.00"
+                match = line.match(/SERVICE FEE\s+[A-Z]+\s+([\d,.]+)/);
+                if (match) {
+                    data.serviceFeeValue = parseFloat(match[1].replace(/,/g, ''));
+                }
+            }
+        }
+        
+        // Extract REMITTANCE amount from table
+        if (line.includes('REMITTANCE') && !line.includes('Description')) {
+            const match = line.match(/REMITTANCE\s+([\d,.]+)/);
+            if (match) {
+                data.remittanceValue = parseFloat(match[1].replace(/,/g, ''));
+            }
+        }
+        
+        // Extract TOTAL from table
+        if (line.match(/^TOTAL\s+[\d,.]+/)) {
+            const match = line.match(/TOTAL\s+([\d,.]+)/);
+            if (match) {
+                data.totalValue = parseFloat(match[1].replace(/,/g, ''));
+            }
+        }
+        
+        if (line.includes('Source')) {
+            const match = line.match(/Source\s+([A-Za-z\s]+?)(?=\s+Purpose|$)/);
+            if (match) data.source = match[1].trim();
+        }
+        if (line.includes('Purpose')) {
+            const match = line.match(/Purpose\s+(.+?)(?=\s+#|$)/);
+            if (match) data.purpose = match[1].trim();
+        }
+    });
+    
+    let payoutAmountFormatted = 'N/A';
+    let payoutCurrency = 'IDR';
+    if (data.fxRate && data.sendAmountValue) {
+        const payoutCalculated = Math.round(data.fxRate * data.sendAmountValue);
+        payoutAmountFormatted = payoutCalculated.toLocaleString('en-US');
+        
+        if (data.beneficiaryCountry) {
+            const country = data.beneficiaryCountry.toLowerCase();
+            if (country.includes('indonesia')) payoutCurrency = 'IDR';
+            else if (country.includes('india')) payoutCurrency = 'INR';
+            else if (country.includes('philippine')) payoutCurrency = 'PHP';
+            else if (country.includes('bangladesh')) payoutCurrency = 'BDT';
+        }
+    }
+    
+    let totalAmountFormatted = 'N/A';
+    let totalCurrency = data.sendAmountCurrency || 'BND';
+    
+    // Use extracted total if available, otherwise calculate
+    if (data.totalValue) {
+        totalAmountFormatted = data.totalValue.toFixed(2);
+    } else if (data.sendAmountValue && data.serviceFeeValue) {
+        const totalCalculated = data.sendAmountValue + data.serviceFeeValue;
+        totalAmountFormatted = totalCalculated.toFixed(2);
+    }
+    
+    // Format values with .00 decimals
+    const sendAmountFormatted = data.sendAmountValue ? data.sendAmountValue.toFixed(2) : 'N/A';
+    const serviceFeeFormatted = data.serviceFeeValue ? data.serviceFeeValue.toFixed(2) : 'N/A';
+    
+    return {
+        receiptNo: data.receiptNo || 'N/A',
+        receiptDate: data.date || 'N/A',
+        senderName: data.senderName || 'N/A',
+        passportNo: data.passportNo || 'N/A',
+        icNo: data.icNo || 'N/A',
+        senderAddress: data.senderAddress || 'N/A',
+        citizenship: data.citizenship || 'N/A',
+        profession: data.profession || 'N/A',
+        senderMobile: data.senderMobile || 'N/A',
+        beneficiaryCountry: data.beneficiaryCountry || 'N/A',
+        beneficiaryBank: data.beneficiaryBank || 'N/A',
+        beneficiaryName: data.beneficiaryName || 'N/A',
+        accountNumber: data.accountNumber || 'N/A',
+        payoutAmount: `${payoutAmountFormatted} ${payoutCurrency}`,
+        payoutAmountValue: payoutAmountFormatted,
+        payoutCurrency: payoutCurrency,
+        fxRate: data.fxRate ? data.fxRate.toString() : 'N/A',
+        sendAmount: data.sendAmountValue ? `${sendAmountFormatted} ${data.sendAmountCurrency}` : 'N/A',
+        sendAmountValue: sendAmountFormatted,
+        sendAmountCurrency: data.sendAmountCurrency || 'BND',
+        serviceFee: serviceFeeFormatted,
+        source: data.source || 'N/A',
+        purpose: data.purpose || 'N/A',
+        totalAmount: `${totalAmountFormatted} ${totalCurrency}`,
+        totalAmountValue: totalAmountFormatted
+    };
+}
+
+function populateReceipt(data) {
+    document.getElementById('receiptNo').textContent = data.receiptNo;
+    document.getElementById('receiptDate').textContent = data.receiptDate;
+    document.getElementById('senderName').textContent = data.senderName;
+    document.getElementById('passportNo').textContent = data.passportNo;
+    document.getElementById('icNo').textContent = data.icNo;
+    document.getElementById('senderAddress').textContent = data.senderAddress;
+    document.getElementById('citizenship').textContent = data.citizenship;
+    document.getElementById('profession').textContent = data.profession;
+    document.getElementById('senderMobile').textContent = data.senderMobile;
+    document.getElementById('beneficiaryCountry').textContent = data.beneficiaryCountry;
+    document.getElementById('beneficiaryName').textContent = data.beneficiaryName;
+    document.getElementById('bankName').textContent = data.beneficiaryBank;
+    document.getElementById('accountNo').textContent = data.accountNumber;
+    document.getElementById('payoutAmount').textContent = data.payoutAmount;
+    document.getElementById('fxRate').textContent = data.fxRate;
+    document.getElementById('sendAmount').textContent = data.sendAmount;
+    document.getElementById('serviceFee').textContent = data.serviceFee;
+    document.getElementById('source').textContent = data.source;
+    document.getElementById('purpose').textContent = data.purpose;
+    document.getElementById('totalAmount').textContent = `Total Amount: ${data.totalAmount}`;
+    
+    document.getElementById('downloadBtn').onclick = () => downloadReceipt(data);
+}
+
+function downloadReceipt(data) {
+    // Create reference number: reversed receipt no (remove 'PG') + '00' + reversed mobile no
+    let processedReceiptNo = data.receiptNo;
+    
+    // Remove 'PG' letters if present (case insensitive)
+    processedReceiptNo = processedReceiptNo.replace(/pg/gi, '');
+    
+    // Reverse the processed receipt number
+    const reversedReceiptNo = processedReceiptNo.split('').reverse().join('');
+    
+    // Reverse mobile number
+    const reversedMobile = data.senderMobile !== 'N/A' ? 
+        data.senderMobile.split('').reverse().join('') : '';
+    
+    // Combine: reversed receipt no + '00' + reversed mobile
+    const referenceNumber = reversedMobile ? 
+        reversedReceiptNo + '00' + reversedMobile : 
+        reversedReceiptNo;
+    
+    // Use the original receipt date from PDF
+    const receiptDate = data.receiptDate;
+    
+    // Updated parameter names to match receipt.html expectations
+    const params = {
+        // Reference number (custom formatted)
+        ref: referenceNumber,
+        senderMobile: data.senderMobile,
+        
+        // Date from PDF index
+        date: receiptDate,
+        
+        // Receiver/Beneficiary name
+        beneficiaryName: data.beneficiaryName,
+        
+        // Bank name
+        bankName: data.beneficiaryBank,
+        
+        // Account number
+        accountNo: data.accountNumber,
+        
+        // Receive amount (payout amount value only, no currency)
+        amount: data.payoutAmountValue.replace(/,/g, ''),
+        
+        // Exchange rate
+        exchangeRate: data.fxRate,
+        
+        // Amount sent
+        payInAmount: data.sendAmountValue + ' ' + data.sendAmountCurrency,
+        
+        // Charge (service fee)
+        serviceCharge: data.serviceFee,
+        
+        // Total amount
+        totalAmount: data.totalAmountValue + ' ' + data.sendAmountCurrency,
+        
+        // Additional info for receipt
+        payoutCountry: data.beneficiaryCountry,
+        paymentChannel: 'Bank Transfer'
+    };
+    
+    const receiptUrl = 'receipt.html?' + new URLSearchParams(params).toString();
+    window.open(receiptUrl, '_blank');
+}
+    </script>
+</body>
+</html>
+
+
